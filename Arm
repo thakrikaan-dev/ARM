@@ -1,0 +1,274 @@
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+
+local Window = Rayfield:CreateWindow({
+   Name = "ARMGAY Script",
+   Icon = 0, -- Icon in Topbar. Can use Lucide Icons (string) or Roblox Image (number). 0 to use no icon (default).
+   LoadingTitle = "Loading",
+   LoadingSubtitle = "Loading",
+   ShowText = "ARMGAY", -- for mobile users to unhide rayfield, change if you'd like
+   Theme = "Default", -- Check https://docs.sirius.menu/rayfield/configuration/themes
+
+   ToggleUIKeybind = "K", -- The keybind to toggle the UI visibility (string like "K" or Enum.KeyCode)
+
+   DisableRayfieldPrompts = false,
+   DisableBuildWarnings = false, -- Prevents Rayfield from warning when the script has a version mismatch with the interface
+
+   ConfigurationSaving = {
+      Enabled = true,
+      FolderName = nil, -- Create a custom folder for your hub/game
+      FileName = "Big Hub"
+   },
+
+   Discord = {
+      Enabled = false, -- Prompt the user to join your Discord server if their executor supports it
+      Invite = "noinvitelink", -- The Discord invite code, do not include discord.gg/. E.g. discord.gg/ ABCD would be ABCD
+      RememberJoins = true -- Set this to false to make them join the discord every time they load it up
+   },
+
+   KeySystem = false, -- Set this to true to use our key system
+   KeySettings = {
+      Title = "Untitled",
+      Subtitle = "Key System",
+      Note = "No method of obtaining the key is provided", -- Use this to tell the user how to get a key
+      FileName = "Key", -- It is recommended to use something unique as other scripts using Rayfield may overwrite your key file
+      SaveKey = true, -- The user's key will be saved, but if you change the key, they will be unable to use your script
+      GrabKeyFromSite = false, -- If this is true, set Key below to the RAW site you would like Rayfield to get the key from
+      Key = {"Hello"} -- List of keys that will be accepted by the system, can be RAW file links (pastebin, github etc) or simple strings ("hello","key22")
+   }
+})
+
+local Tab = Window:CreateTab("Player", 4483362458) -- Title, Image
+
+local Slider = Tab:CreateSlider({
+   Name = "Speed",
+   Range = {0, 300},
+   Increment = 1,
+   Suffix = "Speed",
+   CurrentValue = 16,
+   Flag = "Slider1", -- A flag is the identifier for the configuration file, make sure every element has a different flag if you're using configuration saving to ensure no overlaps
+   Callback = function(Value)
+        game.Players.LocalPlayer.Character.Humanoid.WalkSpeed = (Value)
+   end,
+})
+
+local Slider = Tab:CreateSlider({
+   Name = "jump",
+   Range = {0, 200},
+   Increment = 1,
+   Suffix = "jump",
+   CurrentValue = 7.199999809265137,
+   Flag = "Slider1", -- A flag is the identifier for the configuration file, make sure every element has a different flag if you're using configuration saving to ensure no overlaps
+   Callback = function(Value)
+        game.Players.LocalPlayer.Character.Humanoid.JumpHeight = (Value)
+   end,
+})
+
+-- ...existing code...
+-- ESP implementation
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+
+local ESPTab = Window:CreateTab("ESP", 4483362458)
+
+local espEnabled = false
+local showNames = true
+local showBoxes = true
+local showTracers = false
+local showDistance = false
+local teamCheck = true
+local espColor = Color3.fromRGB(255, 0, 0)
+local sizeMultiplier = 1
+
+ESPTab:CreateToggle({
+    Name = "Enabled",
+    Flag = "ESPEnabled",
+    CurrentValue = false,
+    Callback = function(v) espEnabled = v end,
+})
+
+ESPTab:CreateToggle({
+    Name = "Names",
+    Flag = "ESPNames",
+    CurrentValue = true,
+    Callback = function(v) showNames = v end,
+})
+
+ESPTab:CreateToggle({
+    Name = "Boxes",
+    Flag = "ESPBoxes",
+    CurrentValue = true,
+    Callback = function(v) showBoxes = v end,
+})
+
+ESPTab:CreateToggle({
+    Name = "Tracers",
+    Flag = "ESPTracers",
+    CurrentValue = false,
+    Callback = function(v) showTracers = v end,
+})
+
+ESPTab:CreateToggle({
+    Name = "Distance",
+    Flag = "ESPDistance",
+    CurrentValue = false,
+    Callback = function(v) showDistance = v end,
+})
+
+ESPTab:CreateToggle({
+    Name = "Team Check",
+    Flag = "ESPTeamCheck",
+    CurrentValue = true,
+    Callback = function(v) teamCheck = v end,
+})
+
+ESPTab:CreateColorPicker({
+    Name = "ESP Color",
+    Flag = "ESPColor",
+    Color = espColor,
+    Callback = function(c) espColor = c end,
+})
+
+ESPTab:CreateSlider({
+    Name = "Size",
+    Range = {0.5, 3},
+    Increment = 0.1,
+    Suffix = "x",
+    CurrentValue = 1,
+    Flag = "ESPSize",
+    Callback = function(v) sizeMultiplier = v end,
+})
+
+local espObjects = {} -- [player] = {box, name, tracer, dist}
+
+local function createDrawings(p)
+    if espObjects[p] then return end
+    local box = Drawing.new("Square")
+    box.Thickness = 2
+    box.Filled = false
+    box.Transparency = 1
+
+    local nameTag = Drawing.new("Text")
+    nameTag.Size = 14
+    nameTag.Center = true
+    nameTag.Outline = true
+
+    local tracer = Drawing.new("Line")
+    tracer.Thickness = 1
+    tracer.Transparency = 1
+
+    local distText = Drawing.new("Text")
+    distText.Size = 12
+    distText.Center = true
+    distText.Outline = true
+
+    espObjects[p] = {
+        box = box,
+        name = nameTag,
+        tracer = tracer,
+        dist = distText,
+    }
+end
+
+local function removeDrawings(p)
+    local o = espObjects[p]
+    if not o then return end
+    for _, d in pairs(o) do
+        if d and d.Remove then
+            pcall(function() d:Remove() end)
+        end
+    end
+    espObjects[p] = nil
+end
+
+Players.PlayerRemoving:Connect(function(p) removeDrawings(p) end)
+Players.PlayerAdded:Connect(function(p) -- prepare when player joins
+    createDrawings(p)
+end)
+
+-- initialize existing players
+for _, p in pairs(Players:GetPlayers()) do
+    if p ~= LocalPlayer then createDrawings(p) end
+end
+
+RunService.RenderStepped:Connect(function()
+    if not Camera then Camera = workspace.CurrentCamera end
+    for _, p in pairs(Players:GetPlayers()) do
+        if p == LocalPlayer then
+            -- hide local player's drawings if any
+            if espObjects[p] then
+                local o = espObjects[p]
+                for _, d in pairs(o) do if d then d.Visible = false end end
+            end
+            continue
+        end
+
+        local char = p.Character
+        local humanoid = char and char:FindFirstChildOfClass("Humanoid")
+        local root = char and (char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso") or char:FindFirstChild("UpperTorso"))
+        if not char or not humanoid or humanoid.Health <= 0 or not root then
+            removeDrawings(p)
+            continue
+        end
+
+        createDrawings(p)
+        local o = espObjects[p]
+        if not o then continue end
+
+        if not espEnabled then
+            for _, d in pairs(o) do if d then d.Visible = false end end
+            continue
+        end
+
+        local head = char:FindFirstChild("Head")
+        local headPos = head and head.Position or (root.Position + Vector3.new(0, 1.5, 0))
+        local rootPos = root.Position
+
+        local headScreen, headOnScreen = Camera:WorldToViewportPoint(headPos + Vector3.new(0, 0.3, 0))
+        local rootScreen, rootOnScreen = Camera:WorldToViewportPoint(rootPos)
+        local onScreen = headOnScreen or rootOnScreen
+
+        local color = espColor
+        if teamCheck and p.Team and LocalPlayer.Team and p.Team == LocalPlayer.Team then
+            color = p.TeamColor.Color
+        end
+
+        if not onScreen then
+            for _, d in pairs(o) do if d then d.Visible = false end end
+            continue
+        end
+
+        -- compute box size from head/root screen positions
+        local height = math.abs(headScreen.Y - rootScreen.Y)
+        if height < 6 then height = 6 end
+        local width = math.clamp(height / 2, 6, 300) * sizeMultiplier
+
+        -- Box
+        o.box.Color = color
+        o.box.Size = Vector2.new(width, height)
+        o.box.Position = Vector2.new(headScreen.X - width/2, headScreen.Y - height)
+        o.box.Visible = showBoxes
+
+        -- Name
+        local distance = math.floor((LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") and (LocalPlayer.Character.HumanoidRootPart.Position - rootPos).Magnitude) or 0)
+        o.name.Text = (showNames and (p.Name .. (showDistance and (" ["..distance.."m]") or ""))) or ""
+        o.name.Position = Vector2.new(headScreen.X, headScreen.Y - (height + 12))
+        o.name.Color = color
+        o.name.Visible = showNames
+
+        -- Distance (separate, below name if needed)
+        o.dist.Text = (showDistance and tostring(distance .. "m")) or ""
+        o.dist.Position = Vector2.new(headScreen.X, headScreen.Y - (height + 2))
+        o.dist.Color = color
+        o.dist.Visible = false -- not used separately since distance appended to name above
+
+        -- Tracer (from bottom-center of screen to root)
+        o.tracer.From = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
+        o.tracer.To = Vector2.new(rootScreen.X, rootScreen.Y)
+        o.tracer.Color = color
+        o.tracer.Visible = showTracers
+    end
+end)
+-- ...existing code...
