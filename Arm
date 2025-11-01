@@ -272,3 +272,91 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 -- ...existing code...
+
+-- ...existing code...
+-- Rayfield NoClip toggle
+local noclipEnabled = false
+local noclipConn
+local originalCanCollide = {}
+
+local function setPartCanCollide(part, state)
+    if not part or not part:IsA("BasePart") then return end
+    pcall(function() part.CanCollide = state end)
+end
+
+local function applyNoClipToCharacter(character, enable)
+    if not character then return end
+    for _, part in ipairs(character:GetDescendants()) do
+        if part:IsA("BasePart") then
+            if enable then
+                if originalCanCollide[part] == nil then
+                    originalCanCollide[part] = part.CanCollide
+                end
+                setPartCanCollide(part, false)
+            else
+                if originalCanCollide[part] ~= nil then
+                    setPartCanCollide(part, originalCanCollide[part])
+                    originalCanCollide[part] = nil
+                else
+                    setPartCanCollide(part, true)
+                end
+            end
+        end
+    end
+end
+
+local function startNoClipLoop()
+    if noclipConn then noclipConn:Disconnect() end
+    noclipConn = RunService.Heartbeat:Connect(function()
+        if noclipEnabled and LocalPlayer and LocalPlayer.Character then
+            applyNoClipToCharacter(LocalPlayer.Character, true)
+        end
+    end)
+end
+
+local function stopNoClipLoop()
+    if noclipConn then noclipConn:Disconnect() noclipConn = nil end
+    if LocalPlayer and LocalPlayer.Character then
+        applyNoClipToCharacter(LocalPlayer.Character, false)
+    end
+    originalCanCollide = {}
+end
+
+-- Add toggle to the existing Player tab (uses `Tab` defined earlier)
+Tab:CreateToggle({
+    Name = "NoClip",
+    Flag = "NoClipToggle",
+    CurrentValue = false,
+    Callback = function(v)
+        noclipEnabled = v
+        if v then
+            -- small delay to allow character parts to exist
+            task.delay(0.05, function()
+                if LocalPlayer and LocalPlayer.Character then
+                    applyNoClipToCharacter(LocalPlayer.Character, true)
+                end
+                startNoClipLoop()
+            end)
+        else
+            stopNoClipLoop()
+        end
+    end,
+})
+
+-- Reapply/restore on respawn
+if LocalPlayer then
+    LocalPlayer.CharacterAdded:Connect(function(char)
+        task.wait(0.05)
+        if noclipEnabled then
+            applyNoClipToCharacter(char, true)
+        else
+            applyNoClipToCharacter(char, false)
+        end
+    end)
+    -- ensure collisions restored on character removal
+    LocalPlayer.CharacterRemoving:Connect(function(char)
+        if char then applyNoClipToCharacter(char, false) end
+    end)
+end
+-- ...existing code...
+
