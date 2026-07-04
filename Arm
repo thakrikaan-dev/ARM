@@ -1,6 +1,5 @@
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
--- ข้อมูลตัวแปรหลักสำหรับ Camlock
 local player = game.Players.LocalPlayer
 local aimRadius = 150
 local target = nil
@@ -14,7 +13,6 @@ local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
--- สร้างหน้าต่าง UI หลัก
 local Window = Rayfield:CreateWindow({
    Name = "ARMGAY Script",
    Icon = 0,
@@ -71,7 +69,6 @@ Tab:CreateSlider({
    end,
 })
 
--- === [แก้ไขบั๊ก] ระบบ NoClip แยกออกจาก ESP เด็ดขาด ไม่ติดบล็อกเวลารัน ===
 local noclipEnabled = false
 local noclipConn
 
@@ -98,7 +95,6 @@ Tab:CreateToggle({
     end,
 })
 
--- === ระบบ Fly ===
 local flyEnabled = false
 local flySpeed = 75
 local flyBV, flyBG, flyConn
@@ -195,7 +191,6 @@ Tab:CreateSlider({
     Callback = function(v) flySpeed = v end,
 })
 
--- ระบบ Infinite Jump
 local infJumpEnabled = false
 Tab:CreateToggle({
     Name = "Infinite Jump",
@@ -214,7 +209,7 @@ UserInputService.JumpRequest:Connect(function()
 end)
 
 --------------------------------------------------------------------
--- [TAB] COMBAT (Smooth Camlock ปุ่ม E ค้าง)
+-- [TAB] COMBAT
 --------------------------------------------------------------------
 local CombatTab = Window:CreateTab("Combat", 4483362458)
 
@@ -274,18 +269,35 @@ end
 local function getClosestTarget()
     local closestDistance = aimRadius
     local closestTarget = nil
+    
     for _, v in pairs(workspace:GetChildren()) do
         if v:IsA("Model") and v:FindFirstChild("Humanoid") and v:FindFirstChild("Head") and v ~= player.Character then
-            local targetPosition = v.Head.Position
-            local screenPosition, onScreen = Camera:WorldToScreenPoint(targetPosition)
-            if onScreen and hasLineOfSight(v) then
-                local screenCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
-                local distance = (Vector2.new(screenPosition.X, screenPosition.Y) - screenCenter).Magnitude
-                if distance < closestDistance then
-                    closestDistance = distance
-                    closestTarget = v
+            
+            -- ค้นหา Player จากโมเดลเพื่อทำการ Check Team
+            local targetPlayer = Players:GetPlayerFromCharacter(v)
+            local isTeammate = false
+            if targetPlayer and player.Team and targetPlayer.Team and player.Team == targetPlayer.Team then
+                isTeammate = true
+            end
+            
+            -- ถ้าไม่ใช่เพื่อนร่วมทีม และผ่านเงื่อนไขอื่นๆ ถึงจะทำการล็อกเป้า
+            if not isTeammate then
+                local humanoid = v:FindFirstChildOfClass("Humanoid")
+                if humanoid and humanoid.Health > 0 and humanoid:GetState() ~= Enum.HumanoidStateType.Dead then
+                    local targetPosition = v.Head.Position
+                    local screenPosition, onScreen = Camera:WorldToScreenPoint(targetPosition)
+                    
+                    if onScreen and hasLineOfSight(v) then
+                        local screenCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+                        local distance = (Vector2.new(screenPosition.X, screenPosition.Y) - screenCenter).Magnitude
+                        if distance < closestDistance then
+                            closestDistance = distance
+                            closestTarget = v
+                        end
+                    end
                 end
             end
+            
         end
     end
     return closestTarget
@@ -325,7 +337,7 @@ local espEnabled = false
 local showNames = true 
 local teamCheck = true
 local mm2RoleCheck = true 
-local espColor = Color3.fromRGB(0, 255, 100) -- สีเขียวเริ่มต้นสำหรับ Innocent
+local espColor = Color3.fromRGB(0, 255, 100)
 
 ESPTab:CreateToggle({
     Name = "Enabled ESP",
@@ -362,7 +374,6 @@ ESPTab:CreateColorPicker({
     Callback = function(c) espColor = c end,
 })
 
--- ฟังก์ชันตรวจสอบบทบาท MM2
 local function getMM2Role(p)
     if not p then return "Innocent", espColor end
     
@@ -384,7 +395,6 @@ local function applyESP(p)
     local function setupCharacter(char)
         if not char then return end
         
-        -- 1. Highlight 3D
         local highlight = char:FindFirstChild("FullBodyESP")
         if not highlight then
             highlight = Instance.new("Highlight")
@@ -394,7 +404,6 @@ local function applyESP(p)
             highlight.Parent = char
         end
         
-        -- 2. BillboardGui
         local nameGui = char:FindFirstChild("ESPNameGui")
         local nameLabel
         if not nameGui then
@@ -433,7 +442,6 @@ local function applyESP(p)
             local currentValidColor = espColor
             local roleText = ""
             
-            -- === [แก้ไขบั๊ก] นำส่วนตรวจสอบสวิตช์ noclipEnabled ที่ทับซ้อนและดึงค่า CanCollide ผิดพลาดออกไปเรียบร้อยแล้ว ===
             if mm2RoleCheck then
                 local role, roleColor = getMM2Role(p)
                 currentValidColor = roleColor
@@ -466,19 +474,38 @@ for _, p in pairs(Players:GetPlayers()) do applyESP(p) end
 Players.PlayerAdded:Connect(applyESP)
 
 --------------------------------------------------------------------
--- MAIN LOOP (Render และจัดการระบบรวมทั้งหมด)
+-- MAIN LOOP
 --------------------------------------------------------------------
-RunService.RenderStepped:Connect(function()
+RunService.RenderStepped:Connect(function(deltaTime)
     Camera = workspace.CurrentCamera
     fovCircle.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
     
     if isHoldingE and isCamLocked then
-        if not target or not target:FindFirstChild("Head") or (target:FindFirstChild("Humanoid") and target.Humanoid.Health <= 0) then
+        if target then
+            local humanoid = target:FindFirstChildOfClass("Humanoid")
+            local head = target:FindFirstChild("Head")
+            
+            local onScreen = false
+            if head then
+                local _, isVisible = Camera:WorldToScreenPoint(head.Position)
+                onScreen = isVisible
+            end
+            
+            -- ปลดล็อกเป้าหมายทันทีถ้าตาย เพื่อป้องกันอาการกล้องตกพื้น
+            if not head or not humanoid or humanoid.Health <= 0 or not onScreen or humanoid:GetState() == Enum.HumanoidStateType.Dead then
+                target = nil
+            end
+        end
+        
+        if not target then
             target = getClosestTarget()
         end
+        
         if target and target:FindFirstChild("Head") then
             local targetCFrame = CFrame.new(Camera.CFrame.Position, target.Head.Position)
-            Camera.CFrame = Camera.CFrame:Lerp(targetCFrame, smoothness)
+            -- ปรับตาม DeltaTime เพื่อความสมูทที่คงที่ในทุกระดับ FPS
+            local fpsAdjustment = math.clamp(smoothness * (deltaTime * 60), 0.01, 1)
+            Camera.CFrame = Camera.CFrame:Lerp(targetCFrame, fpsAdjustment)
         end
     end
 end)
