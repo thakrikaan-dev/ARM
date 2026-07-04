@@ -71,7 +71,7 @@ Tab:CreateSlider({
    end,
 })
 
--- === ระบบ NoClip ===
+-- === [แก้ไขบั๊ก] ระบบ NoClip แยกออกจาก ESP เด็ดขาด ไม่ติดบล็อกเวลารัน ===
 local noclipEnabled = false
 local noclipConn
 
@@ -325,7 +325,7 @@ local espEnabled = false
 local showNames = true 
 local teamCheck = true
 local mm2RoleCheck = true 
-local espColor = Color3.fromRGB(0, 255, 100) -- เปลี่ยนสีเริ่มต้นเป็นสีเขียวสว่าง
+local espColor = Color3.fromRGB(0, 255, 100) -- สีเขียวเริ่มต้นสำหรับ Innocent
 
 ESPTab:CreateToggle({
     Name = "Enabled ESP",
@@ -335,7 +335,7 @@ ESPTab:CreateToggle({
 })
 
 ESPTab:CreateToggle({
-    Name = "MM2 Role Check",
+    Name = "MM2 Role Check (Murder/Sheriff)",
     Flag = "MM2RoleCheck",
     CurrentValue = true,
     Callback = function(v) mm2RoleCheck = v end,
@@ -356,13 +356,13 @@ ESPTab:CreateToggle({
 })
 
 ESPTab:CreateColorPicker({
-    Name = "ESP Color",
+    Name = "ESP Color (Innocent)",
     Flag = "ESPColor",
-    Color = espColor, -- แสดงสีเขียวเริ่มต้นในหลอดเลือกสี
+    Color = espColor,
     Callback = function(c) espColor = c end,
 })
 
--- ฟังก์ชันสำหรับตรวจสอบบทบาทผู้เล่นใน MM2
+-- ฟังก์ชันตรวจสอบบทบาท MM2
 local function getMM2Role(p)
     if not p then return "Innocent", espColor end
     
@@ -370,12 +370,12 @@ local function getMM2Role(p)
     local char = p.Character
     
     if (backpack and backpack:FindFirstChild("Knife")) or (char and char:FindFirstChild("Knife")) then
-        return "Murderer", Color3.fromRGB(255, 0, 0) -- ฆาตกร = สีแดง
+        return "Murderer", Color3.fromRGB(255, 0, 0)
     elseif (backpack and backpack:FindFirstChild("Gun")) or (char and char:FindFirstChild("Gun")) then
-        return "Sheriff", Color3.fromRGB(0, 100, 255) -- นายอำเภอ/มือปืน = สีน้ำเงิน
+        return "Sheriff", Color3.fromRGB(0, 100, 255)
     end
     
-    return "Innocent", espColor -- คนบริสุทธิ์ = ใช้สีเขียวที่ตั้งไว้
+    return "Innocent", espColor
 end
 
 local function applyESP(p)
@@ -384,7 +384,7 @@ local function applyESP(p)
     local function setupCharacter(char)
         if not char then return end
         
-        -- 1. Highlight ครอบคลุมทั้งตัวละครแบบ 3D
+        -- 1. Highlight 3D
         local highlight = char:FindFirstChild("FullBodyESP")
         if not highlight then
             highlight = Instance.new("Highlight")
@@ -394,7 +394,7 @@ local function applyESP(p)
             highlight.Parent = char
         end
         
-        -- 2. BillboardGui สำหรับระบุชื่อและบทบาทเหนือหัว
+        -- 2. BillboardGui
         local nameGui = char:FindFirstChild("ESPNameGui")
         local nameLabel
         if not nameGui then
@@ -433,6 +433,7 @@ local function applyESP(p)
             local currentValidColor = espColor
             local roleText = ""
             
+            -- === [แก้ไขบั๊ก] นำส่วนตรวจสอบสวิตช์ noclipEnabled ที่ทับซ้อนและดึงค่า CanCollide ผิดพลาดออกไปเรียบร้อยแล้ว ===
             if mm2RoleCheck then
                 local role, roleColor = getMM2Role(p)
                 currentValidColor = roleColor
